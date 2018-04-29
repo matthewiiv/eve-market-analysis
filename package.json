@@ -1,0 +1,31 @@
+{
+  "name": "eve-market-analysis",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matthewiiv/eve-market-analysis.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/matthewiiv/eve-market-analysis/issues"
+  },
+  "homepage": "https://github.com/matthewiiv/eve-market-analysis#readme",
+  "dependencies": {
+    "hapi": "^17.4.0",
+    "inert": "^5.1.0",
+    "path": "^0.12.7",
+    "striptags": "^3.1.1",
+    "superagent": "^3.8.2"
+  },
+  "devDependencies": {
+    "hapi-pino": "^4.0.4",
+    "nodemon": "^1.17.3"
+  }
+}

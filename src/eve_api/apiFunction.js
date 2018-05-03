@@ -150,9 +150,11 @@ function getAllAPIOrders(regionIds, regionIndex, attempt) {
                 }
                 let itemsOrdersFlat = [].concat(...itemsOrders);
                 var buyOrders = itemsOrdersFlat.filter((order) => {
+                  order.lastUpdated = Date.now();
                   return order.is_buy_order;
                 });
                 var sellOrders = itemsOrdersFlat.filter((order) => {
+                  order.lastUpdated = Date.now();
                   return !order.is_buy_order;
                 });
                 client.hmset(`region:${regionId}`,"buy", JSON.stringify(buyOrders), "sell", JSON.stringify(sellOrders), "lastUpdated", JSON.stringify(Date.now()), (err, response) => {

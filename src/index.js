@@ -7,8 +7,7 @@ const testFunction = require('./helpers/eveMarketAnalysis');
 const testParallel = require('./eve_api/apiFunction');
 const typeIds = require('./data').typeIds;
 const regionIds = require('./data').regionIds;
-
-const bankBalance = 1000000;
+const nullSecs = require('./data').nullSecs;
 
 var redis = require("redis")
 var client = redis.createClient();
@@ -24,61 +23,68 @@ client.on("error", function (err) {
 });
 
 //function getRegionOrders
-client.hget("region:10000001", "sell", (err,reply) => {
-  if (err) {
-    console.log(err);
-  }
-  let bestItemPrices = [];
-  let items = JSON.parse(reply);
-  for (var i = 0, len = items.length; i < len; i++) {
-    if (bestItemPrices[items[i].type_id] !== undefined) {
-      if(items[i].price < bestItemPrices[items[i].type_id].price) {
-        bestItemPrices[items[i].type_id] = items[i];
+function getBestPricesFromRegion(locationId, bankBalance) {
+
+  return new Promise((resolve) => {
+    client.hget(`region:${locationId}`, "sell", (err,reply) => {
+      if (err) {
+        console.log(err);
       }
-    } else {
-      bestItemPrices[items[i].type_id] = items[i];
-    }
-  }
-  bestItemPrices = bestItemPrices.filter(n => true)
-  let typeIds = bestItemPrices;
-  let bestBuyPrices = [];
-  getAndCompareOtherRegionBuyPrices(regionIds, 0, typeIds, 0, bestBuyPrices, (bestBuyPrices) => {
-    // Decide what to do with bestBuyPrices array and best Item Prices to get best hauling routes
-    let orderedDeals = [];
-    for (var i = 0, len = bestItemPrices.length; i < len; i++) {
-      let bestBuyItem = bestBuyPrices[bestItemPrices[i].type_id]
-      if (bestBuyItem !== undefined) {
-        let maxTransactionVolume = Math.min(bestBuyItem.volume_remain, bestItemPrices[i].volume_remain)
-        let maxRealProfit = (bestBuyItem.price - bestItemPrices[i].price) * maxTransactionVolume
-        let profitMargin = bestBuyItem.price / bestItemPrices[i].price;
-        let purchasePrice = bestItemPrices[i].price;
-
-        let totalPurchasePrice = purchasePrice;
-        let j = 1;
-
-        while(totalPurchasePrice < bankBalance && j <= maxTransactionVolume) {
-          j++;
-          totalPurchasePrice = j * purchasePrice;
+      let bestItemPrices = [];
+      let items = JSON.parse(reply);
+      for (var i = 0, len = items.length; i < len; i++) {
+        if (bestItemPrices[items[i].type_id] !== undefined) {
+          if(items[i].price < bestItemPrices[items[i].type_id].price) {
+            bestItemPrices[items[i].type_id] = items[i];
+          }
+        } else {
+          bestItemPrices[items[i].type_id] = items[i];
         }
-
-
-        bestBuyItem.profitMargin = profitMargin;
-        bestBuyItem.maxRealProfit = maxRealProfit;
-        bestBuyItem.purchase_price = bestItemPrices[i].price;
-        bestBuyItem.maxTransactionVolume = maxTransactionVolume;
-        bestBuyItem.maxTransactionAmount = maxTransactionVolume  * bestBuyItem.purchase_price;
-        bestBuyItem.numberToBuy = (j-1);
-        bestBuyItem.totalPurchaseValue = (j-1) * purchasePrice;
-        bestBuyItem.actualProfit = ((j-1) * purchasePrice * profitMargin) - bestBuyItem.totalPurchaseValue;
-        orderedDeals.push(bestBuyItem);
       }
-    }
-    orderedDeals.sort(function(a, b) {
-      return b.actualProfit - a.actualProfit;
+      bestItemPrices = bestItemPrices.filter(n => true)
+      let typeIds = bestItemPrices;
+      let bestBuyPrices = [];
+      getAndCompareOtherRegionBuyPrices(regionIds, 0, typeIds, 0, bestBuyPrices, (bestBuyPrices) => {
+        // Decide what to do with bestBuyPrices array and best Item Prices to get best hauling routes
+        let orderedDeals = [];
+        for (var i = 0, len = bestItemPrices.length; i < len; i++) {
+          let bestBuyItem = bestBuyPrices[bestItemPrices[i].type_id]
+          if (bestBuyItem !== undefined) {
+            let maxTransactionVolume = Math.min(bestBuyItem.volume_remain, bestItemPrices[i].volume_remain)
+            let maxRealProfit = (bestBuyItem.price - bestItemPrices[i].price) * maxTransactionVolume
+            let profitMargin = bestBuyItem.price / bestItemPrices[i].price;
+            let purchasePrice = bestItemPrices[i].price;
+
+            let totalPurchasePrice = purchasePrice;
+            let j = 1;
+
+            while(totalPurchasePrice < bankBalance && j <= maxTransactionVolume) {
+              j++;
+              totalPurchasePrice = j * purchasePrice;
+            }
+
+            bestBuyItem.purchaseSystem = bestItemPrices[i].system_id;
+            bestBuyItem.profitMargin = profitMargin;
+            bestBuyItem.maxRealProfit = maxRealProfit;
+            bestBuyItem.purchase_price = bestItemPrices[i].price;
+            bestBuyItem.maxTransactionVolume = maxTransactionVolume;
+            bestBuyItem.maxTransactionAmount = maxTransactionVolume  * bestBuyItem.purchase_price;
+            bestBuyItem.numberToBuy = (j-1);
+            bestBuyItem.totalPurchaseValue = (j-1) * purchasePrice;
+            bestBuyItem.actualProfit = ((j-1) * purchasePrice * profitMargin) - bestBuyItem.totalPurchaseValue;
+            bestBuyItem.age = (Date.now() - bestBuyItem.lastUpdated) / 60000;
+            orderedDeals.push(bestBuyItem);
+          }
+        }
+        orderedDeals.sort(function(a, b) {
+          return b.actualProfit - a.actualProfit;
+        });
+        //console.log(orderedDeals.slice(0, 4))
+        resolve(JSON.stringify(orderedDeals.slice(0, 8)))
+      });
     });
-    console.log(orderedDeals.slice(0, 4))
-  })
-})
+  });
+}
 
 function getAndCompareOtherRegionBuyPrices(regionIds, regionIndex, typeIds, typeIdIndex, bestBuyPrices, callback) {
   let typeId = typeIds[typeIdIndex].type_id;
@@ -97,11 +103,13 @@ function getAndCompareOtherRegionBuyPrices(regionIds, regionIndex, typeIds, type
       let itemBuyOrders = JSON.parse(reply);
       for (var i = 0, len = itemBuyOrders.length; i < len; i++) {
         if (bestBuyPrices[itemBuyOrders[i].type_id] !== undefined) {
-          if(itemBuyOrders[i].price > bestBuyPrices[itemBuyOrders[i].type_id].price) {
+          if(itemBuyOrders[i].price > bestBuyPrices[itemBuyOrders[i].type_id].price && nullSecs.indexOf(itemBuyOrders[i].system_id) < 0) {
             bestBuyPrices[itemBuyOrders[i].type_id] = itemBuyOrders[i];
           }
         } else {
-          bestBuyPrices[itemBuyOrders[i].type_id] = itemBuyOrders[i];
+          if(nullSecs.indexOf(itemBuyOrders[i].system_id) < 0) {
+            bestBuyPrices[itemBuyOrders[i].type_id] = itemBuyOrders[i];
+          }
         }
       }
       if (regionIndex < regionIds.length - 1) {
@@ -130,15 +138,6 @@ const server = Hapi.server({
   host: 'localhost'
 });
 
-server.route({
-  method: 'GET',
-  path: '/{name}',
-  handler: (request, h) => {
-    request.logger.info('In handler %s', request.path);
-    return `Hello, ${encodeURIComponent(request.params.name)}!`;
-  }
-});
-
 const init = async () => {
 
   await server.register(require('inert'));
@@ -147,7 +146,23 @@ const init = async () => {
     method: 'GET',
     path: '/',
     handler: (request, h) => {
-      return h.file('./public/index.html');
+      //return h.file('./public/index.html');
+      return "Hello"
+    }
+  });
+
+  server.route({
+    method: 'GET',
+    path: '/haul',
+    handler: async function (request, reply) {
+      var params = request.query
+      console.log(params)
+      try {
+        let data = await getBestPricesFromRegion(params.region, params.balance);
+        return data;
+      } catch (error) {
+        reply(error);
+      }
     }
   });
 

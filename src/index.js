@@ -9,14 +9,14 @@ const typeIds = require('./data').typeIds;
 const regionIds = require('./data').regionIds;
 const nullSecs = require('./data').nullSecs;
 
-const badItems = [17366, 17368];
+const badItems = [17366, 17368, 672, 11134, 11132];
 
 var redis = require("redis")
 var client = redis.createClient();
 //testFunction();
 
 let bestHaul = [];
-let fundsToInvest = 600000;
+let fundsToInvest = 700000;
 
 testParallel(regionIds, 0, 1);
 
@@ -116,7 +116,7 @@ function getBestPricesFromRegion(locationId, bankBalance) {
             bestBuyItem.totalPurchaseValue = (j-1) * purchasePrice;
             bestBuyItem.actualProfit = ((j-1) * purchasePrice * profitMargin) - bestBuyItem.totalPurchaseValue;
             bestBuyItem.age = (Date.now() - bestBuyItem.lastUpdated) / 60000;
-            if (nullSecs.indexOf(bestBuyItem.purchaseSystem) < 0 && badItems.indexOf(bestBuyItem.type_id) < 0) {
+            if (nullSecs.indexOf(bestBuyItem.purchaseSystem) < 0 && badItems.indexOf(bestBuyItem.type_id) < 0 && bestBuyItem.age < 60) {
               orderedDeals.push(bestBuyItem);
             }
           }

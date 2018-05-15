@@ -16,7 +16,7 @@ var client = redis.createClient();
 //testFunction();
 
 let bestHaul = [];
-let fundsToInvest = 700000;
+let fundsToInvest = 7900000;
 
 testParallel(regionIds, 0, 1);
 

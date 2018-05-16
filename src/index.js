@@ -3,7 +3,6 @@ const request = require('superagent');
 const async = require('async');
 const Hapi = require('hapi');
 
-const testFunction = require('./helpers/eveMarketAnalysis');
 const testParallel = require('./eve_api/apiFunction');
 const typeIds = require('./data').typeIds;
 const regionIds = require('./data').regionIds;
